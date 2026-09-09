@@ -49,8 +49,8 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 .panel-head h2{margin:0;font-size:22px;font-weight:500;}
 .panel-head .btn-primary{flex:none;padding:11px 20px;font-size:14px;}
 
-.table-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
-table{width:100%;border-collapse:collapse;font-size:14px;}
+.table-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:900px;}
 th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle;}
 th{color:var(--muted);font-weight:500;font-size:12.5px;text-transform:none;background:var(--panel);}
 tr:last-child td{border-bottom:none;}
@@ -81,6 +81,16 @@ td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;backgroun
 .webhook-status.ok{background:#e4f4ec;color:var(--success);}
 .webhook-status.fail{background:#fbeaea;color:var(--danger);}
 .webhook-status.pending{background:var(--panel);color:var(--muted);}
+.webhook-meta{font-size:11px;color:var(--muted);}
+.webhook-error{font-size:11px;color:var(--danger);}
+
+/* Tracking / ETA inline editor in the orders table */
+.tracking-cell{display:flex;flex-direction:column;gap:6px;min-width:150px;}
+.tracking-cell input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;font-family:inherit;background:#fbfaf8;transition:border-color .2s ease,background .2s ease;}
+.tracking-cell input:focus{outline:none;border-color:var(--wine);background:#fff;}
+.save-tracking-btn{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:11.5px;font-weight:500;transition:background .2s ease;}
+.save-tracking-btn:hover{background:var(--panel);}
+.order-number-cell{font-weight:500;font-size:12.5px;}
 
 .row-actions button{background:none;border:none;color:var(--wine);font-size:13px;padding:0;margin-right:14px;font-weight:500;}
 .row-actions .delete{color:var(--danger);}
@@ -162,7 +172,7 @@ td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;backgroun
     <div class="panel-head"><h2>Orders</h2></div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+        <thead><tr><th>Order #</th><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th><th>Message</th><th>Placed</th></tr></thead>
         <tbody id="ordersTableBody"></tbody>
       </table>
     </div>
@@ -418,36 +428,208 @@ async function deleteProduct(id) {
   loadProducts();
 }
 
+// ---- Orders: status pipeline, tracking, and delivery-message status ----
+
+const STATUS_STEPS = ["ordered", "prepared", "shipped", "completed"];
+const STATUS_LABELS = { ordered: "Ordered", prepared: "Prepared", shipped: "Shipped", completed: "Completed" };
+const EVENT_LABELS = {
+  order_placed: "Order confirmation",
+  order_status_changed: "Status update",
+  order_fulfilled: "Completion message",
+  order_shipping_updated: "Tracking update"
+};
+const MESSAGE_LABELS = { pending: "Sending…", sent: "Sent", failed: "Failed" };
+
+let currentOrders = [];
+let latestLogByOrder = {};
+let notifChannel = null;
+
 async function loadOrders() {
-  const { data, error } = await supabaseClient.from("orders").select("*, order_items(product_name, quantity, unit_price)").order("created_at", { ascending: false });
+  const { data, error } = await supabaseClient
+    .from("orders")
+    .select("*, order_items(product_name, quantity, unit_price)")
+    .order("created_at", { ascending: false });
   if (error) return console.error(error);
-  renderOrdersTable(data || []);
+  currentOrders = data || [];
+  await loadNotificationLogs(currentOrders.map(o => o.id));
+  renderOrdersTable(currentOrders);
+  subscribeNotificationLogs();
+}
+
+// Pulls every log for the orders currently shown and keeps only the
+// most recent one per order (rows come back newest-first, so the
+// first one seen per order_id wins).
+async function loadNotificationLogs(orderIds) {
+  latestLogByOrder = {};
+  if (!orderIds.length) return;
+  const { data, error } = await supabaseClient
+    .from("notification_logs")
+    .select("*")
+    .in("order_id", orderIds)
+    .order("created_at", { ascending: false });
+  if (error) { console.error(error); return; }
+  (data || []).forEach(log => {
+    if (!latestLogByOrder[log.order_id]) latestLogByOrder[log.order_id] = log;
+  });
+}
+
+// Live updates: the moment n8n calls report_notification_result (or
+// a new status change inserts a fresh pending row), this flips the
+// badge in place — no reload, no polling required.
+function subscribeNotificationLogs() {
+  if (notifChannel) return;
+  notifChannel = supabaseClient
+    .channel("admin-notification-logs")
+    .on("postgres_changes", { event: "*", schema: "public", table: "notification_logs" }, payload => {
+      const log = payload.new;
+      if (!log) return;
+      const existing = latestLogByOrder[log.order_id];
+      if (!existing || log.id === existing.id || new Date(log.created_at) >= new Date(existing.created_at)) {
+        latestLogByOrder[log.order_id] = log;
+        updateWebhookCellInPlace(log.order_id);
+      }
+    })
+    .subscribe();
 }
 
 function renderOrdersTable(orders) {
   const body = document.getElementById("ordersTableBody");
-  if (orders.length === 0) { body.innerHTML = `<tr><td colspan="6">No orders yet.</td></tr>`; return; }
-  const statuses = ["ordered", "prepared", "shipped", "completed", "cancelled"];
+  if (orders.length === 0) { body.innerHTML = `<tr><td colspan="9">No orders yet.</td></tr>`; return; }
   body.innerHTML = orders.map(o => {
     const itemsLine = (o.order_items || []).map(i => `${i.quantity}× ${escapeHtml(i.product_name)}`).join(", ");
     const placed = new Date(o.created_at).toLocaleString();
     return `
       <tr>
+        <td class="order-number-cell">${escapeHtml(o.order_number || "—")}</td>
         <td>${escapeHtml(o.customer_name)}</td>
         <td>${escapeHtml(o.phone)}</td>
         <td class="order-items-line">${itemsLine}</td>
         <td>$${Number(o.total).toFixed(2)}</td>
-        <td><select class="status-select" data-id="${o.id}">${statuses.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+        <td>${buildStatusCell(o)}</td>
+        <td>${buildTrackingCell(o)}</td>
+        <td id="webhookCell-${o.id}">${buildWebhookCell(o, latestLogByOrder[o.id])}</td>
         <td>${placed}</td>
       </tr>`;
   }).join("");
-  body.querySelectorAll(".status-select").forEach(sel => sel.addEventListener("change", () => updateOrderStatus(sel.dataset.id, sel.value)));
+
+  body.querySelectorAll(".pipe-step").forEach(b => b.addEventListener("click", () => updateOrderStatus(b.dataset.id, b.dataset.status)));
+  body.querySelectorAll(".cancel-link").forEach(b => b.addEventListener("click", () => {
+    if (confirm("Cancel this order? The customer will get a cancellation message.")) updateOrderStatus(b.dataset.id, "cancelled");
+  }));
+  body.querySelectorAll(".reactivate-link").forEach(b => b.addEventListener("click", () => {
+    if (confirm("Reactivate this order back to \"Ordered\"?")) updateOrderStatus(b.dataset.id, "ordered");
+  }));
+  body.querySelectorAll(".save-tracking-btn").forEach(b => b.addEventListener("click", () => saveTracking(b.dataset.id)));
+  body.querySelectorAll(".webhook-check-btn").forEach(b => b.addEventListener("click", () => recheckNotification(b.dataset.id)));
+
+  positionAllPipeIndicators();
+}
+
+function buildStatusCell(order) {
+  if (order.status === "cancelled") {
+    return `
+      <div class="status-cell">
+        <span class="cancelled-badge">✕ Cancelled</span>
+        <button class="reactivate-link" data-id="${order.id}">Reactivate</button>
+      </div>`;
+  }
+  const activeIndex = STATUS_STEPS.indexOf(order.status);
+  const stepsHtml = STATUS_STEPS.map((s, i) => `
+    <button class="pipe-step ${i === activeIndex ? "active" : ""}" data-id="${order.id}" data-status="${s}">${STATUS_LABELS[s]}</button>`).join("");
+  return `
+    <div class="status-cell">
+      <div class="status-pipeline">
+        <span class="pipe-indicator"></span>
+        ${stepsHtml}
+      </div>
+      <button class="cancel-link" data-id="${order.id}">Cancel order</button>
+    </div>`;
+}
+
+// Sizes/positions the sliding pill under the active pipeline step.
+// Runs after the table HTML is in the DOM so offsetWidth/offsetLeft
+// are accurate.
+function positionAllPipeIndicators() {
+  document.querySelectorAll(".status-pipeline").forEach(pipeline => {
+    const active = pipeline.querySelector(".pipe-step.active");
+    const indicator = pipeline.querySelector(".pipe-indicator");
+    if (!active || !indicator) return;
+    indicator.style.width = `${active.offsetWidth}px`;
+    indicator.style.transform = `translateX(${active.offsetLeft - 3}px)`;
+  });
+}
+
+function buildTrackingCell(order) {
+  if (order.status === "cancelled") return `<span style="color:var(--muted);font-size:12.5px;">—</span>`;
+  const trackingVal = escapeAttr(order.tracking_number || "");
+  const etaVal = order.estimated_delivery ? String(order.estimated_delivery).slice(0, 10) : "";
+  return `
+    <div class="tracking-cell">
+      <input type="text" class="tracking-input" data-id="${order.id}" placeholder="Tracking #" value="${trackingVal}" />
+      <input type="date" class="eta-input" data-id="${order.id}" value="${etaVal}" />
+      <button class="save-tracking-btn" data-id="${order.id}">Save</button>
+    </div>`;
+}
+
+async function saveTracking(orderId) {
+  const trackingInput = document.querySelector(`.tracking-input[data-id="${orderId}"]`);
+  const etaInput = document.querySelector(`.eta-input[data-id="${orderId}"]`);
+  const tracking_number = trackingInput.value.trim() || null;
+  const estimated_delivery = etaInput.value || null;
+  const { error } = await supabaseClient.from("orders").update({ tracking_number, estimated_delivery }).eq("id", orderId);
+  if (error) return showToast(error.message);
+  showToast("Tracking info saved — customer notified if the order is shipped");
+  loadOrders();
+}
+
+// Shows whether the WhatsApp message for this order's most recent
+// event has actually gone out (sent), is still in flight (pending),
+// or failed — pulled from notification_logs, which n8n reports back
+// into after it actually calls Green API.
+function buildWebhookCell(order, log) {
+  if (!log) {
+    return `
+      <div class="webhook-cell">
+        <span class="webhook-status pending"><span class="dot"></span>No message yet</span>
+      </div>`;
+  }
+  const cssClass = log.status === "sent" ? "ok" : log.status === "failed" ? "fail" : "pending";
+  const when = new Date(log.updated_at || log.created_at).toLocaleString();
+  return `
+    <div class="webhook-cell">
+      <span class="webhook-status ${cssClass}"><span class="dot"></span>${MESSAGE_LABELS[log.status] || log.status}</span>
+      <span class="webhook-meta">${escapeHtml(EVENT_LABELS[log.event] || log.event)} · ${when}</span>
+      ${log.status === "failed" && log.error_message ? `<span class="webhook-error">${escapeHtml(log.error_message)}</span>` : ""}
+      <button class="webhook-check-btn" data-id="${order.id}">Recheck</button>
+    </div>`;
+}
+
+function updateWebhookCellInPlace(orderId) {
+  const td = document.getElementById(`webhookCell-${orderId}`);
+  if (!td) return; // order isn't in the currently loaded table
+  const order = currentOrders.find(o => o.id === orderId) || { id: orderId };
+  td.innerHTML = buildWebhookCell(order, latestLogByOrder[orderId]);
+  const btn = td.querySelector(".webhook-check-btn");
+  if (btn) btn.addEventListener("click", () => recheckNotification(orderId));
+}
+
+async function recheckNotification(orderId) {
+  const { data, error } = await supabaseClient
+    .from("notification_logs")
+    .select("*")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) return showToast(error.message);
+  latestLogByOrder[orderId] = (data && data[0]) || null;
+  updateWebhookCellInPlace(orderId);
 }
 
 async function updateOrderStatus(orderId, status) {
   const { error } = await supabaseClient.from("orders").update({ status }).eq("id", orderId);
   if (error) return showToast(error.message);
-  showToast("Order updated");
+  showToast("Order updated — customer notified");
+  loadOrders();
 }
 
 function showToast(msg) { toast.textContent = msg; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2200); }
