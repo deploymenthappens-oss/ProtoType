@@ -77,6 +77,16 @@ td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;backgroun
 .toast{position:fixed;bottom:26px;right:26px;background:var(--ink);color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none;z-index:60;}
 .toast.show{opacity:1;transform:translateY(0);}
 
+.image-upload{display:flex;align-items:center;gap:14px;}
+.image-preview{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--panel);border:1px solid var(--line);flex:none;}
+.image-upload-controls{flex:1;min-width:0;}
+.upload-btn{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:13.5px;font-weight:500;transition:background .2s ease;}
+.upload-btn:hover{background:var(--panel);}
+.upload-hint{color:var(--muted);font-size:12px;margin:6px 0 0;}
+.upload-status{font-size:12.5px;margin-top:6px;display:none;}
+.upload-status.uploading{display:block;color:var(--muted);}
+.upload-status.error{display:block;color:var(--wine);}
+
 @media (max-width:640px){
   .admin-topbar,.tabs,.tab-panel{padding-left:18px;padding-right:18px;}
   table{font-size:13px;}
@@ -145,7 +155,19 @@ td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;backgroun
     <div class="field"><label for="pDescription">Description</label><textarea id="pDescription" rows="2"></textarea></div>
     <div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" step="0.01" min="0" /></div>
     <div class="field"><label for="pStock">Stock</label><input type="number" id="pStock" step="1" min="0" /></div>
-    <div class="field"><label for="pImage">Image URL</label><input type="text" id="pImage" placeholder="https://..." /></div>
+    <div class="field">
+      <label for="pImageFile">Product image</label>
+      <div class="image-upload">
+        <img id="pImagePreview" class="image-preview" src="https://placehold.co/80x80?text=%20" alt="" />
+        <div class="image-upload-controls">
+          <label class="upload-btn" for="pImageFile">Choose image</label>
+          <input type="file" id="pImageFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+          <p class="upload-hint">JPEG, PNG, WebP or GIF · up to 5MB</p>
+          <p class="field-error upload-status" id="uploadStatus"></p>
+        </div>
+      </div>
+      <input type="hidden" id="pImage" />
+    </div>
     <div class="field">
       <label for="pActive">Status</label>
       <select id="pActive"><option value="true">Active</option><option value="false">Inactive</option></select>
@@ -169,6 +191,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 // ================================================================
 
 let editingProductId = null;
+let currentProducts = [];
 const loginView = document.getElementById("loginView");
 const dashboardView = document.getElementById("dashboardView");
 const toast = document.getElementById("toast");
@@ -207,7 +230,8 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 async function loadProducts() {
   const { data, error } = await supabaseClient.from("products").select("*").order("created_at", { ascending: false });
   if (error) return console.error(error);
-  renderProductsTable(data || []);
+  currentProducts = data || [];
+  renderProductsTable(currentProducts);
 }
 
 function renderProductsTable(products) {
@@ -233,6 +257,8 @@ document.getElementById("newProductBtn").addEventListener("click", () => openPro
 document.getElementById("cancelProduct").addEventListener("click", closeProductModal);
 document.getElementById("saveProduct").addEventListener("click", saveProduct);
 
+let uploadingImage = false;
+
 function openProductModal(product) {
   editingProductId = product ? product.id : null;
   document.getElementById("productModalTitle").textContent = product ? "Edit product" : "Add product";
@@ -241,13 +267,78 @@ function openProductModal(product) {
   document.getElementById("pPrice").value = product?.price ?? "";
   document.getElementById("pStock").value = product?.stock ?? "";
   document.getElementById("pImage").value = product?.image_url || "";
+  document.getElementById("pImagePreview").src = product?.image_url || placeholderImg();
+  document.getElementById("pImageFile").value = "";
+  uploadingImage = false;
+  setUploadStatus("", false);
   document.getElementById("pActive").value = product ? String(product.is_active) : "true";
   document.getElementById("productError").style.display = "none";
   document.getElementById("productBackdrop").classList.add("open");
 }
 function closeProductModal() { document.getElementById("productBackdrop").classList.remove("open"); }
 
+// ---- Image upload (Supabase Storage) ----
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB, matches the bucket's server-side limit
+
+document.getElementById("pImageFile").addEventListener("change", handleImageSelected);
+
+async function handleImageSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Client-side checks first (fast feedback); the storage bucket
+  // enforces the same rules server-side as a backstop.
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    setUploadStatus("Please choose a JPEG, PNG, WebP or GIF image.", true);
+    e.target.value = "";
+    return;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    setUploadStatus("Image is too large — max 5MB.", true);
+    e.target.value = "";
+    return;
+  }
+
+  uploadingImage = true;
+  setUploadStatus("Uploading…", false);
+  document.getElementById("saveProduct").disabled = true;
+
+  try {
+    // Random, extension-only filename — never trust the original
+    // filename (avoids path traversal / overwrite collisions).
+    const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
+    const path = `${crypto.randomUUID()}.${ext}`;
+
+    const { error: uploadError } = await supabaseClient
+      .storage.from("product-images")
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabaseClient
+      .storage.from("product-images")
+      .getPublicUrl(path);
+
+    document.getElementById("pImage").value = publicUrlData.publicUrl;
+    document.getElementById("pImagePreview").src = publicUrlData.publicUrl;
+    setUploadStatus("Image uploaded.", false);
+  } catch (err) {
+    setUploadStatus(err.message || "Upload failed. Please try again.", true);
+  } finally {
+    uploadingImage = false;
+    document.getElementById("saveProduct").disabled = false;
+  }
+}
+
+function setUploadStatus(msg, isError) {
+  const el = document.getElementById("uploadStatus");
+  el.textContent = msg;
+  el.classList.toggle("error", isError);
+  el.style.display = msg ? "block" : "none";
+}
+
 async function saveProduct() {
+  if (uploadingImage) { setUploadStatus("Please wait for the image to finish uploading.", true); return; }
   const name = document.getElementById("pName").value.trim();
   const description = document.getElementById("pDescription").value.trim();
   const price = parseFloat(document.getElementById("pPrice").value);
@@ -271,8 +362,15 @@ async function saveProduct() {
 
 async function deleteProduct(id) {
   if (!confirm("Delete this product? This can't be undone.")) return;
+  const product = currentProducts.find(p => p.id === id);
   const { error } = await supabaseClient.from("products").delete().eq("id", id);
   if (error) return showToast(error.message);
+  // Best-effort cleanup of the uploaded image; ignore failures (e.g.
+  // the image_url wasn't one of our uploads) so deletion still succeeds.
+  if (product?.image_url && product.image_url.includes("/product-images/")) {
+    const path = product.image_url.split("/product-images/")[1];
+    if (path) supabaseClient.storage.from("product-images").remove([path]).catch(() => {});
+  }
   showToast("Product deleted");
   loadProducts();
 }
