@@ -295,7 +295,7 @@ function renderProductsTable(products) {
     <tr>
       <td><img class="thumb" src="${escapeAttr(p.image_url || placeholderImg())}" alt="" /></td>
       <td>${escapeHtml(p.name)}</td>
-      <td>$${Number(p.price).toFixed(2)}</td>
+      <td>${formatMoney(p.price)}</td>
       <td>${p.stock}</td>
       <td><span class="status-badge">${p.is_active ? "Active" : "Inactive"}</span></td>
       <td class="row-actions">
@@ -505,7 +505,7 @@ function renderOrdersTable(orders) {
         <td>${escapeHtml(o.customer_name)}</td>
         <td>${escapeHtml(o.phone)}</td>
         <td class="order-items-line">${itemsLine}</td>
-        <td>$${Number(o.total).toFixed(2)}</td>
+        <td>${formatMoney(o.total)}</td>
         <td>${buildStatusCell(o)}</td>
         <td>${buildTrackingCell(o)}</td>
         <td id="webhookCell-${o.id}">${buildWebhookCell(o, latestLogByOrder[o.id])}</td>
@@ -643,6 +643,7 @@ async function updateOrderStatus(orderId, status) {
 function showToast(msg) { toast.textContent = msg; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2200); }
 function placeholderImg() { return "https://placehold.co/80x80?text=%20"; }
 function escapeHtml(str) { return String(str ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s])); }
+function formatMoney(n) { return `${Number(n).toLocaleString("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L.E`; }
 function escapeAttr(str) { return escapeHtml(str); }
 </script>
 </body>
