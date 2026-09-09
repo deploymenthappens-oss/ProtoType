@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Maison — Shop</title>
+<title>Timeless — Shop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#15130f;
@@ -20,7 +20,8 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
-h1,h2,h3,.brand,.price,.confirm-wrap h2{font-family:'Fraunces',serif;}
+h1,h2,h3,.brand,.price,.confirm-wrap h2{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-0.02em;}
+.brand{font-weight:700;}
 a{color:inherit;}
 button{font-family:'Inter',sans-serif;cursor:pointer;}
 
@@ -52,11 +53,32 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
   font-size:12px;font-weight:600;padding:0 6px;
 }
 
-/* ---------- Hero ---------- */
-.hero{padding:88px 40px 48px;max-width:640px;}
-.hero .eyebrow{color:var(--wine);font-size:13px;font-weight:600;letter-spacing:0.06em;margin:0 0 14px;}
-.hero h1{font-size:44px;line-height:1.12;font-weight:500;margin:0 0 16px;letter-spacing:-0.01em;}
-.hero p{color:var(--muted);font-size:16px;margin:0;max-width:440px;}
+/* ---------- Cinematic banner ---------- */
+.cinema-banner{
+  position:relative;overflow:hidden;min-height:56vh;
+  display:flex;align-items:center;padding:0 40px;
+  background:linear-gradient(160deg,#15130f 0%,#1d1912 55%,#221b13 100%);
+  color:#fff;
+}
+.cinema-bg{position:absolute;inset:0;z-index:0;}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;mix-blend-mode:screen;will-change:transform;}
+.blob-a{width:520px;height:520px;background:radial-gradient(circle, var(--wine) 0%, transparent 70%);top:-140px;left:-90px;animation:driftA 24s ease-in-out infinite alternate;}
+.blob-b{width:420px;height:420px;background:radial-gradient(circle, var(--gold) 0%, transparent 70%);bottom:-160px;right:-40px;animation:driftB 28s ease-in-out infinite alternate;}
+.blob-c{width:320px;height:320px;background:radial-gradient(circle, #4a3a26 0%, transparent 70%);top:22%;right:18%;animation:driftC 32s ease-in-out infinite alternate;}
+@keyframes driftA{from{transform:translate(0,0) scale(1);}to{transform:translate(70px,50px) scale(1.18);}}
+@keyframes driftB{from{transform:translate(0,0) scale(1);}to{transform:translate(-60px,-35px) scale(1.12);}}
+@keyframes driftC{from{transform:translate(0,0) scale(1);}to{transform:translate(35px,-45px) scale(0.88);}}
+.grain{position:absolute;inset:0;opacity:.05;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.cinema-content{position:relative;z-index:1;max-width:640px;padding:110px 0;}
+.cinema-content .eyebrow{color:var(--gold);font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin:0 0 16px;opacity:0;animation:fadeUp .6s ease forwards .05s;}
+.cinema-content h1{font-size:50px;line-height:1.08;font-weight:700;margin:0 0 18px;color:#fff;opacity:0;animation:fadeUp .8s ease forwards .2s;}
+.cinema-content p.sub{color:rgba(255,255,255,0.72);font-size:16.5px;margin:0;max-width:440px;font-weight:400;opacity:0;animation:fadeUp .8s ease forwards .38s;}
+@media (prefers-reduced-motion: reduce){
+  .blob{animation:none !important;}
+  .cinema-content .eyebrow,.cinema-content h1,.cinema-content p.sub{animation:none !important;opacity:1 !important;transform:none !important;}
+}
 
 /* ---------- Grid ---------- */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:28px;padding:16px 40px 96px;}
@@ -206,16 +228,16 @@ button{font-family:'Inter',sans-serif;cursor:pointer;}
 footer{padding:36px 40px;border-top:1px solid var(--line);color:var(--muted);font-size:13px;}
 
 @media (max-width:640px){
-  .nav,.hero,.grid,footer{padding-left:20px;padding-right:20px;}
-  .hero{padding-top:56px;}
-  .hero h1{font-size:32px;}
+  .nav,.cinema-banner,.grid,footer{padding-left:20px;padding-right:20px;}
+  .cinema-content{padding-top:64px;padding-bottom:64px;}
+  .cinema-content h1{font-size:34px;}
 }
 </style>
 </head>
 <body>
 
 <nav class="nav">
-  <div class="brand">Maison</div>
+  <div class="brand">Timeless</div>
   <div class="nav-actions">
     <button class="track-toggle" id="trackToggle">Track order</button>
     <button class="cart-toggle" id="cartToggle">
@@ -224,15 +246,23 @@ footer{padding:36px 40px;border-top:1px solid var(--line);color:var(--muted);fon
   </div>
 </nav>
 
-<section class="hero">
-  <p class="eyebrow">New arrivals</p>
-  <h1>Everyday objects, considered.</h1>
-  <p>A small collection of well-made pieces for the home and desk. Add anything you like to your cart below.</p>
+<section class="cinema-banner">
+  <div class="cinema-bg">
+    <span class="blob blob-a"></span>
+    <span class="blob blob-b"></span>
+    <span class="blob blob-c"></span>
+    <div class="grain"></div>
+  </div>
+  <div class="cinema-content">
+    <p class="eyebrow">New arrivals</p>
+    <h1> Add a premium touch to your home.</h1>
+    <p class="sub">A small collection of well-made pieces for the home and desk. Add anything you like to your cart below.</p>
+  </div>
 </section>
 
 <main class="grid" id="productGrid"></main>
 
-<footer>© <span id="year"></span> Maison. All orders are handled with care.</footer>
+<footer>© <span id="year"></span> Timeless. All orders are handled with care.</footer>
 
 <!-- Cart drawer -->
 <div class="overlay" id="overlay"></div>
@@ -243,7 +273,7 @@ footer{padding:36px 40px;border-top:1px solid var(--line);color:var(--muted);fon
   </div>
   <div class="cart-items" id="cartItems"></div>
   <div class="cart-footer">
-    <div class="total-row"><span>Total</span><span id="cartTotal">$0.00</span></div>
+    <div class="total-row"><span>Total</span><span id="cartTotal">0.00 L.E</span></div>
     <button class="checkout-btn" id="openCheckout" disabled>Checkout</button>
   </div>
 </aside>
@@ -260,7 +290,7 @@ footer{padding:36px 40px;border-top:1px solid var(--line);color:var(--muted);fon
       </div>
       <div class="field">
         <label for="custPhone">Phone number</label>
-        <input type="tel" id="custPhone" placeholder="+1 555 123 4567" />
+        <input type="tel" id="custPhone" placeholder="+20 10 1234 5678" />
       </div>
       <p class="field-error" id="checkoutError"></p>
       <div class="modal-actions">
@@ -302,7 +332,7 @@ footer{padding:36px 40px;border-top:1px solid var(--line);color:var(--muted);fon
       </div>
       <div class="field">
         <label for="trackPhone">Phone number</label>
-        <input type="tel" id="trackPhone" placeholder="+1 555 123 4567" />
+        <input type="tel" id="trackPhone" placeholder="+20 10 1234 5678" />
       </div>
       <p class="field-error" id="trackError"></p>
       <div class="modal-actions">
@@ -373,6 +403,36 @@ const STEPS = [
 ];
 const CHECK_ICON = `<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>`;
 
+function formatMoney(amount) {
+  const n = Number(amount) || 0;
+  return `${n.toLocaleString("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L.E`;
+}
+
+// Keeps at most one leading "+", digits only after that, and caps
+// length to a sane E.164 range — applied live as the person types
+// so a stray extra "+" or pasted junk never accumulates.
+function sanitizePhoneInput(raw) {
+  let value = raw.replace(/[^\d+]/g, "");
+  const hasPlus = value.startsWith("+");
+  let digits = value.replace(/\+/g, "");
+  if (digits.length > 15) digits = digits.slice(0, 15);
+  return (hasPlus ? "+" : "") + digits;
+}
+
+function isValidPhone(value) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
+}
+
+[document.getElementById("custPhone"), document.getElementById("trackPhone")].forEach(input => {
+  input.addEventListener("input", (e) => {
+    const cursorFromEnd = e.target.value.length - e.target.selectionStart;
+    e.target.value = sanitizePhoneInput(e.target.value);
+    const pos = e.target.value.length - cursorFromEnd;
+    e.target.setSelectionRange(pos, pos);
+  });
+});
+
 loadProducts();
 
 document.getElementById("cartToggle").addEventListener("click", () => toggleDrawer(true));
@@ -428,7 +488,7 @@ async function submitTrack() {
   btn.textContent = "Looking up...";
 
   const { data, error } = await supabaseClient.rpc("get_order_status", {
-    p_order_id: orderId,
+    p_order_number: orderId,
     p_phone: phone
   });
 
@@ -478,7 +538,7 @@ function renderTrackResult(order) {
 
   document.getElementById("trackSummary").innerHTML = `
     <div class="row"><span>Items</span><span>${itemsLine || "—"}</span></div>
-    <div class="row"><span>Total</span><span>$${Number(order.total).toFixed(2)}</span></div>
+    <div class="row"><span>Total</span><span>${formatMoney(order.total)}</span></div>
     <div class="row"><span>Placed</span><span>${placed}</span></div>
   `;
 
@@ -510,7 +570,7 @@ function renderProducts() {
           <h3>${escapeHtml(p.name)}</h3>
           <p class="desc">${escapeHtml(p.description || "")}</p>
           <div class="card-footer">
-            <span class="price">$${Number(p.price).toFixed(2)}</span>
+            <span class="price">${formatMoney(p.price)}</span>
             <button class="add-btn" data-id="${p.id}" ${outOfStock ? "disabled" : ""}>${outOfStock ? "Sold out" : "Add"}</button>
           </div>
           ${outOfStock ? "" : `<span class="stock-note">${p.stock} left</span>`}
@@ -548,7 +608,7 @@ function renderCart() {
   const totalQty = cart.reduce((sum, c) => sum + c.quantity, 0);
   const totalPrice = cart.reduce((sum, c) => sum + c.quantity * c.price, 0);
   cartCountEl.textContent = totalQty;
-  cartTotalEl.textContent = `$${totalPrice.toFixed(2)}`;
+  cartTotalEl.textContent = formatMoney(totalPrice);
   openCheckoutBtn.disabled = cart.length === 0;
   if (cart.length === 0) { cartItemsEl.innerHTML = `<p class="empty-note" style="padding:20px 0;">Your cart is empty.</p>`; return; }
   cartItemsEl.innerHTML = cart.map(c => `
@@ -556,7 +616,7 @@ function renderCart() {
       <img src="${escapeAttr(c.image_url || placeholderImg())}" alt="${escapeAttr(c.name)}" />
       <div class="cart-row-info">
         <span class="name">${escapeHtml(c.name)}</span>
-        <span class="unit">$${c.price.toFixed(2)} each</span>
+        <span class="unit">${formatMoney(c.price)} each</span>
         <div class="qty-control">
           <button class="qty-minus" data-id="${c.id}">&minus;</button>
           <span>${c.quantity}</span>
@@ -579,7 +639,7 @@ async function submitOrder() {
   const name = nameInput.value.trim();
   const phone = phoneInput.value.trim();
   if (!name) return showCheckoutError("Enter your full name.");
-  if (!phone || phone.replace(/\D/g, "").length < 7) return showCheckoutError("Enter a valid phone number.");
+  if (!phone || !isValidPhone(phone)) return showCheckoutError("Enter a valid phone number.");
   if (cart.length === 0) return showCheckoutError("Your cart is empty.");
 
   const submitBtn = document.getElementById("submitCheckout");
