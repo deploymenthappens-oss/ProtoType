@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Maison — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#15130f; --paper:#fbfaf7; --line:#e7e1d6;
+  --wine:#6b2737; --wine-deep:#521d2b; --gold:#b08d57;
+  --success:#1f7a54; --danger:#a83b3b; --muted:#7a7468; --panel:#f4f2ec;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+h1,h2,.brand{font-family:'Fraunces',serif;}
+button{font-family:'Inter',sans-serif;cursor:pointer;}
+
+.admin-login{max-width:380px;margin:100px auto;padding:38px;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 30px 60px -30px rgba(21,19,15,0.25);}
+.admin-login h1{font-size:23px;margin:0 0 6px;font-weight:500;}
+.admin-login .sub{color:var(--muted);font-size:14px;margin:0 0 24px;}
+
+.field{margin-bottom:17px;}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:7px;font-weight:500;}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;background:#fbfaf8;transition:border-color .2s ease,background .2s ease;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--wine);background:#fff;}
+.field-error{color:var(--wine);font-size:13px;margin-top:6px;display:none;}
+
+.btn-primary{background:var(--wine);color:#fff;border:none;border-radius:999px;padding:13px;font-weight:500;font-size:15px;transition:background .2s ease;}
+.btn-primary:hover:not(:disabled){background:var(--wine-deep);}
+.btn-secondary{background:#fff;border:1px solid var(--line);border-radius:999px;padding:13px;font-weight:500;transition:background .2s ease;}
+.btn-secondary:hover{background:var(--panel);}
+
+.admin-topbar{display:flex;align-items:center;justify-content:space-between;padding:22px 40px;background:var(--ink);color:#fff;}
+.admin-topbar .brand{font-size:20px;font-weight:500;}
+.logout-btn{background:transparent;border:1px solid rgba(255,255,255,0.28);color:#fff;border-radius:999px;padding:9px 18px;font-size:13.5px;transition:background .2s ease,border-color .2s ease;}
+.logout-btn:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.5);}
+
+.tabs{display:flex;gap:6px;padding:0 40px;border-bottom:1px solid var(--line);background:#fff;}
+.tab-btn{background:none;border:none;padding:16px 18px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;font-size:14.5px;transition:color .2s ease;}
+.tab-btn:hover{color:var(--ink);}
+.tab-btn.active{color:var(--ink);border-bottom-color:var(--wine);}
+.tab-panel{display:none;padding:32px 40px 80px;}
+.tab-panel.active{display:block;}
+
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.panel-head h2{margin:0;font-size:22px;font-weight:500;}
+.panel-head .btn-primary{flex:none;padding:11px 20px;font-size:14px;}
+
+.table-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle;}
+th{color:var(--muted);font-weight:500;font-size:12.5px;text-transform:none;background:var(--panel);}
+tr:last-child td{border-bottom:none;}
+td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;background:var(--panel);}
+
+.status-badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);border:1px solid var(--line);}
+.status-select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;}
+.order-items-line{color:var(--muted);font-size:13px;}
+
+.row-actions button{background:none;border:none;color:var(--wine);font-size:13px;padding:0;margin-right:14px;font-weight:500;}
+.row-actions .delete{color:var(--danger);}
+
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(21,19,15,0.55);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;}
+.modal-backdrop.open{display:flex;}
+.modal{background:#fff;border-radius:20px;width:100%;max-width:420px;padding:34px;box-shadow:0 30px 60px -20px rgba(21,19,15,0.35);animation:modalIn .3s cubic-bezier(.22,1,.36,1);max-height:88vh;overflow-y:auto;}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+.modal h2{margin:0 0 6px;font-size:22px;font-weight:500;}
+.modal .sub{color:var(--muted);font-size:14px;margin:0 0 22px;}
+.modal-actions{display:flex;gap:10px;margin-top:6px;}
+.modal-actions .btn-secondary,.modal-actions .btn-primary{flex:1;}
+.modal-actions .btn-primary:disabled{opacity:.55;cursor:not-allowed;}
+
+.toast{position:fixed;bottom:26px;right:26px;background:var(--ink);color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;opacity:0;transform:translateY(10px);transition:all .25s ease;pointer-events:none;z-index:60;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+@media (max-width:640px){
+  .admin-topbar,.tabs,.tab-panel{padding-left:18px;padding-right:18px;}
+  table{font-size:13px;}
+}
+</style>
+</head>
+<body>
+
+<div id="loginView">
+  <div class="admin-login">
+    <h1>Admin sign in</h1>
+    <p class="sub">Sign in with the admin account created in Supabase Auth.</p>
+    <div class="field">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@yourstore.com" />
+    </div>
+    <div class="field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" />
+    </div>
+    <p class="field-error" id="loginError"></p>
+    <button class="btn-primary" id="loginBtn" style="width:100%;">Sign in</button>
+  </div>
+</div>
+
+<div id="dashboardView" style="display:none;">
+  <header class="admin-topbar">
+    <div class="brand">Maison admin</div>
+    <button class="logout-btn" id="logoutBtn">Sign out</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="products">Products</button>
+    <button class="tab-btn" data-tab="orders">Orders</button>
+  </nav>
+
+  <section class="tab-panel active" id="tab-products">
+    <div class="panel-head">
+      <h2>Products</h2>
+      <button class="btn-primary" id="newProductBtn">Add product</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Name</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+        <tbody id="productsTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tab-panel" id="tab-orders">
+    <div class="panel-head"><h2>Orders</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Status</th><th>Placed</th></tr></thead>
+        <tbody id="ordersTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="modal-backdrop" id="productBackdrop">
+  <div class="modal">
+    <h2 id="productModalTitle">Add product</h2>
+    <p class="sub">Products marked inactive won't show in the store.</p>
+    <div class="field"><label for="pName">Name</label><input type="text" id="pName" /></div>
+    <div class="field"><label for="pDescription">Description</label><textarea id="pDescription" rows="2"></textarea></div>
+    <div class="field"><label for="pPrice">Price</label><input type="number" id="pPrice" step="0.01" min="0" /></div>
+    <div class="field"><label for="pStock">Stock</label><input type="number" id="pStock" step="1" min="0" /></div>
+    <div class="field"><label for="pImage">Image URL</label><input type="text" id="pImage" placeholder="https://..." /></div>
+    <div class="field">
+      <label for="pActive">Status</label>
+      <select id="pActive"><option value="true">Active</option><option value="false">Inactive</option></select>
+    </div>
+    <p class="field-error" id="productError"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="cancelProduct">Cancel</button>
+      <button class="btn-primary" id="saveProduct">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============== Supabase config — fill these in ==============
+const SUPABASE_URL = "__SUPABASE_URL__";
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ================================================================
+
+let editingProductId = null;
+const loginView = document.getElementById("loginView");
+const dashboardView = document.getElementById("dashboardView");
+const toast = document.getElementById("toast");
+
+checkSession();
+document.getElementById("loginBtn").addEventListener("click", login);
+document.getElementById("logoutBtn").addEventListener("click", async () => { await supabaseClient.auth.signOut(); showLogin(); });
+
+async function checkSession() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (data.session) showDashboard(); else showLogin();
+}
+
+async function login() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errorEl = document.getElementById("loginError");
+  errorEl.style.display = "none";
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) { errorEl.textContent = error.message; errorEl.style.display = "block"; return; }
+  showDashboard();
+}
+
+function showLogin() { loginView.style.display = "block"; dashboardView.style.display = "none"; }
+function showDashboard() { loginView.style.display = "none"; dashboardView.style.display = "block"; loadProducts(); loadOrders(); }
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+  });
+});
+
+async function loadProducts() {
+  const { data, error } = await supabaseClient.from("products").select("*").order("created_at", { ascending: false });
+  if (error) return console.error(error);
+  renderProductsTable(data || []);
+}
+
+function renderProductsTable(products) {
+  const body = document.getElementById("productsTableBody");
+  if (products.length === 0) { body.innerHTML = `<tr><td colspan="6">No products yet.</td></tr>`; return; }
+  body.innerHTML = products.map(p => `
+    <tr>
+      <td><img class="thumb" src="${escapeAttr(p.image_url || placeholderImg())}" alt="" /></td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>$${Number(p.price).toFixed(2)}</td>
+      <td>${p.stock}</td>
+      <td><span class="status-badge">${p.is_active ? "Active" : "Inactive"}</span></td>
+      <td class="row-actions">
+        <button class="edit" data-id="${p.id}">Edit</button>
+        <button class="delete" data-id="${p.id}">Delete</button>
+      </td>
+    </tr>`).join("");
+  body.querySelectorAll(".edit").forEach(b => b.addEventListener("click", () => openProductModal(products.find(p => p.id === b.dataset.id))));
+  body.querySelectorAll(".delete").forEach(b => b.addEventListener("click", () => deleteProduct(b.dataset.id)));
+}
+
+document.getElementById("newProductBtn").addEventListener("click", () => openProductModal(null));
+document.getElementById("cancelProduct").addEventListener("click", closeProductModal);
+document.getElementById("saveProduct").addEventListener("click", saveProduct);
+
+function openProductModal(product) {
+  editingProductId = product ? product.id : null;
+  document.getElementById("productModalTitle").textContent = product ? "Edit product" : "Add product";
+  document.getElementById("pName").value = product?.name || "";
+  document.getElementById("pDescription").value = product?.description || "";
+  document.getElementById("pPrice").value = product?.price ?? "";
+  document.getElementById("pStock").value = product?.stock ?? "";
+  document.getElementById("pImage").value = product?.image_url || "";
+  document.getElementById("pActive").value = product ? String(product.is_active) : "true";
+  document.getElementById("productError").style.display = "none";
+  document.getElementById("productBackdrop").classList.add("open");
+}
+function closeProductModal() { document.getElementById("productBackdrop").classList.remove("open"); }
+
+async function saveProduct() {
+  const name = document.getElementById("pName").value.trim();
+  const description = document.getElementById("pDescription").value.trim();
+  const price = parseFloat(document.getElementById("pPrice").value);
+  const stock = parseInt(document.getElementById("pStock").value, 10);
+  const image_url = document.getElementById("pImage").value.trim();
+  const is_active = document.getElementById("pActive").value === "true";
+  const errorEl = document.getElementById("productError");
+  if (!name || isNaN(price) || price < 0 || isNaN(stock) || stock < 0) {
+    errorEl.textContent = "Fill in a valid name, price and stock."; errorEl.style.display = "block"; return;
+  }
+  const payload = { name, description, price, stock, image_url, is_active };
+  const query = editingProductId
+    ? supabaseClient.from("products").update(payload).eq("id", editingProductId)
+    : supabaseClient.from("products").insert(payload);
+  const { error } = await query;
+  if (error) { errorEl.textContent = error.message; errorEl.style.display = "block"; return; }
+  closeProductModal();
+  showToast(editingProductId ? "Product updated" : "Product added");
+  loadProducts();
+}
+
+async function deleteProduct(id) {
+  if (!confirm("Delete this product? This can't be undone.")) return;
+  const { error } = await supabaseClient.from("products").delete().eq("id", id);
+  if (error) return showToast(error.message);
+  showToast("Product deleted");
+  loadProducts();
+}
+
+async function loadOrders() {
+  const { data, error } = await supabaseClient.from("orders").select("*, order_items(product_name, quantity, unit_price)").order("created_at", { ascending: false });
+  if (error) return console.error(error);
+  renderOrdersTable(data || []);
+}
+
+function renderOrdersTable(orders) {
+  const body = document.getElementById("ordersTableBody");
+  if (orders.length === 0) { body.innerHTML = `<tr><td colspan="6">No orders yet.</td></tr>`; return; }
+  const statuses = ["ordered", "prepared", "shipped", "completed", "cancelled"];
+  body.innerHTML = orders.map(o => {
+    const itemsLine = (o.order_items || []).map(i => `${i.quantity}× ${escapeHtml(i.product_name)}`).join(", ");
+    const placed = new Date(o.created_at).toLocaleString();
+    return `
+      <tr>
+        <td>${escapeHtml(o.customer_name)}</td>
+        <td>${escapeHtml(o.phone)}</td>
+        <td class="order-items-line">${itemsLine}</td>
+        <td>$${Number(o.total).toFixed(2)}</td>
+        <td><select class="status-select" data-id="${o.id}">${statuses.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+        <td>${placed}</td>
+      </tr>`;
+  }).join("");
+  body.querySelectorAll(".status-select").forEach(sel => sel.addEventListener("change", () => updateOrderStatus(sel.dataset.id, sel.value)));
+}
+
+async function updateOrderStatus(orderId, status) {
+  const { error } = await supabaseClient.from("orders").update({ status }).eq("id", orderId);
+  if (error) return showToast(error.message);
+  showToast("Order updated");
+}
+
+function showToast(msg) { toast.textContent = msg; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2200); }
+function placeholderImg() { return "https://placehold.co/80x80?text=%20"; }
+function escapeHtml(str) { return String(str ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s])); }
+function escapeAttr(str) { return escapeHtml(str); }
+</script>
+</body>
+</html>
