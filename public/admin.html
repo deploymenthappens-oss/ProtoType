@@ -83,6 +83,7 @@ td img.thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;backgroun
 .webhook-status.pending{background:var(--panel);color:var(--muted);}
 .webhook-meta{font-size:11px;color:var(--muted);}
 .webhook-error{font-size:11px;color:var(--danger);}
+.webhook-message{font-size:11.5px;color:var(--ink);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;cursor:help;}
 
 /* Tracking / ETA inline editor in the orders table */
 .tracking-cell{display:flex;flex-direction:column;gap:6px;min-width:150px;}
@@ -595,10 +596,17 @@ function buildWebhookCell(order, log) {
   }
   const cssClass = log.status === "sent" ? "ok" : log.status === "failed" ? "fail" : "pending";
   const when = new Date(log.updated_at || log.created_at).toLocaleString();
+  // message_text is only populated once n8n reports back (see
+  // notification-message-text-fix.sql) - it holds the exact WhatsApp
+  // text that was sent (or attempted, on failure), never invented here.
+  const messageHtml = log.message_text
+    ? `<span class="webhook-message" title="${escapeAttr(log.message_text)}">${escapeHtml(log.message_text)}</span>`
+    : "";
   return `
     <div class="webhook-cell">
       <span class="webhook-status ${cssClass}"><span class="dot"></span>${MESSAGE_LABELS[log.status] || log.status}</span>
       <span class="webhook-meta">${escapeHtml(EVENT_LABELS[log.event] || log.event)} · ${when}</span>
+      ${messageHtml}
       ${log.status === "failed" && log.error_message ? `<span class="webhook-error">${escapeHtml(log.error_message)}</span>` : ""}
       <button class="webhook-check-btn" data-id="${order.id}">Recheck</button>
     </div>`;
