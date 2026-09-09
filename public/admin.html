@@ -278,8 +278,18 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    // The Orders table is rendered while its panel is still
+    // display:none (Products is the default active tab), so every
+    // offsetWidth/offsetLeft read in positionAllPipeIndicators() came
+    // back 0 and the sliding pill collapsed. Recompute now that the
+    // panel is actually visible.
+    if (btn.dataset.tab === "orders") positionAllPipeIndicators();
   });
 });
+
+// Recompute on resize too, since offsetWidth/offsetLeft change with
+// the viewport (e.g. status labels wrapping differently).
+window.addEventListener("resize", positionAllPipeIndicators);
 
 async function loadProducts() {
   const { data, error } = await supabaseClient.from("products").select("*").order("created_at", { ascending: false });
@@ -295,7 +305,7 @@ function renderProductsTable(products) {
     <tr>
       <td><img class="thumb" src="${escapeAttr(p.image_url || placeholderImg())}" alt="" /></td>
       <td>${escapeHtml(p.name)}</td>
-      <td>${formatMoney(p.price)}</td>
+      <td>$${Number(p.price).toFixed(2)}</td>
       <td>${p.stock}</td>
       <td><span class="status-badge">${p.is_active ? "Active" : "Inactive"}</span></td>
       <td class="row-actions">
@@ -444,6 +454,8 @@ const MESSAGE_LABELS = { pending: "Sending…", sent: "Sent", failed: "Failed" }
 let currentOrders = [];
 let latestLogByOrder = {};
 let notifChannel = null;
+let ordersChannel = null;
+let ordersReloadTimer = null;
 
 async function loadOrders() {
   const { data, error } = await supabaseClient
@@ -455,6 +467,31 @@ async function loadOrders() {
   await loadNotificationLogs(currentOrders.map(o => o.id));
   renderOrdersTable(currentOrders);
   subscribeNotificationLogs();
+  subscribeOrders();
+}
+
+// Live updates for the orders list itself: a new order coming in
+// from the storefront, or a status/tracking change made from another
+// admin tab, both land here instantly instead of waiting for a
+// manual page refresh. Requires "orders" and "order_items" to be
+// added to the supabase_realtime publication (see the reliability
+// migration) — notification_logs and products already were, orders
+// and order_items were not, which is why only those two updated live
+// before. Debounced because create_order() touches orders + several
+// order_items rows in one transaction, and a status change plus its
+// notification_logs insert can also arrive within milliseconds of
+// each other.
+function subscribeOrders() {
+  if (ordersChannel) return;
+  const scheduleReload = () => {
+    clearTimeout(ordersReloadTimer);
+    ordersReloadTimer = setTimeout(loadOrders, 250);
+  };
+  ordersChannel = supabaseClient
+    .channel("admin-orders")
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, scheduleReload)
+    .subscribe();
 }
 
 // Pulls every log for the orders currently shown and keeps only the
@@ -505,7 +542,7 @@ function renderOrdersTable(orders) {
         <td>${escapeHtml(o.customer_name)}</td>
         <td>${escapeHtml(o.phone)}</td>
         <td class="order-items-line">${itemsLine}</td>
-        <td>${formatMoney(o.total)}</td>
+        <td>$${Number(o.total).toFixed(2)}</td>
         <td>${buildStatusCell(o)}</td>
         <td>${buildTrackingCell(o)}</td>
         <td id="webhookCell-${o.id}">${buildWebhookCell(o, latestLogByOrder[o.id])}</td>
@@ -643,7 +680,6 @@ async function updateOrderStatus(orderId, status) {
 function showToast(msg) { toast.textContent = msg; toast.classList.add("show"); setTimeout(() => toast.classList.remove("show"), 2200); }
 function placeholderImg() { return "https://placehold.co/80x80?text=%20"; }
 function escapeHtml(str) { return String(str ?? "").replace(/[&<>"']/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[s])); }
-function formatMoney(n) { return `${Number(n).toLocaleString("en-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L.E`; }
 function escapeAttr(str) { return escapeHtml(str); }
 </script>
 </body>
