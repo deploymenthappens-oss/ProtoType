@@ -198,7 +198,19 @@ const toast = document.getElementById("toast");
 
 checkSession();
 document.getElementById("loginBtn").addEventListener("click", login);
-document.getElementById("logoutBtn").addEventListener("click", async () => { await supabaseClient.auth.signOut(); showLogin(); });
+document.getElementById("logoutBtn").addEventListener("click", async () => { await supabaseClient.auth.signOut(); });
+
+// Reacts to auth state changes as they happen — not just on page
+// load. Covers: token refresh failing, the session expiring, or
+// the admin signing out in another tab. SIGNED_IN/TOKEN_REFRESHED
+// keep the dashboard in sync; SIGNED_OUT bounces back to login.
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    if (dashboardView.style.display === "none") showDashboard();
+  } else {
+    showLogin();
+  }
+});
 
 async function checkSession() {
   const { data } = await supabaseClient.auth.getSession();
@@ -210,8 +222,17 @@ async function login() {
   const password = document.getElementById("loginPassword").value;
   const errorEl = document.getElementById("loginError");
   errorEl.style.display = "none";
+  if (!email || !password) { errorEl.textContent = "Enter your email and password."; errorEl.style.display = "block"; return; }
+  const loginBtn = document.getElementById("loginBtn");
+  loginBtn.disabled = true;
+  loginBtn.textContent = "Signing in…";
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  loginBtn.disabled = false;
+  loginBtn.textContent = "Sign in";
   if (error) { errorEl.textContent = error.message; errorEl.style.display = "block"; return; }
+  // showDashboard() also fires via onAuthStateChange above; calling
+  // it here too just avoids a flash of the login form while that
+  // event is still in flight.
   showDashboard();
 }
 
