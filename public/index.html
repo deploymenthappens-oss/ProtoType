@@ -586,6 +586,44 @@ async function loadProducts() {
   if (error) { productGrid.innerHTML = `<p class="empty-note">Couldn't load products right now.</p>`; console.error(error); return; }
   products = data || [];
   renderProducts();
+  reconcileCartWithProducts();
+  subscribeProductChanges();
+}
+
+// If a product the shopper already has in their cart gets sold out,
+// deactivated, or its stock drops below what's in the cart while
+// they're mid-browse (e.g. the admin just edited it), trim the cart
+// to match reality instead of letting checkout fail with a stale total.
+function reconcileCartWithProducts() {
+  if (cart.length === 0) return;
+  let changed = false;
+  cart = cart.filter(c => {
+    const p = products.find(pr => pr.id === c.id);
+    if (!p) { changed = true; return false; }
+    if (c.quantity > p.stock) {
+      if (p.stock <= 0) { changed = true; return false; }
+      c.quantity = p.stock;
+      changed = true;
+    }
+    return true;
+  });
+  if (changed) {
+    renderCart();
+    showToast("Your cart was updated to match current stock");
+  }
+}
+
+// Live sync: the moment the admin adds, edits, or removes a product,
+// this grid updates on its own - no manual page refresh needed.
+let productsChannel = null;
+function subscribeProductChanges() {
+  if (productsChannel) return;
+  productsChannel = supabaseClient
+    .channel("storefront-products")
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
+      loadProducts();
+    })
+    .subscribe();
 }
 
 function renderProducts() {
